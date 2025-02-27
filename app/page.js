@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 export default function Home() {
   const [nowPlaying, setNowPlaying] = useState(null);
   const [error, setError] = useState('');
+  const [volume, setVolume] = useState(1);
 
   // Met à jour les métadonnées reçues via SSE
   const updateNowPlaying = (npData) => {
@@ -21,9 +22,7 @@ export default function Home() {
       // Intercepteur sur le message LOAD (optionnel)
       playerManager.setMessageInterceptor(
         window.cast.framework.messages.MessageType.LOAD,
-        (request) => {
-          return request;
-        }
+        (request) => request
       );
       context.start();
       console.log("SDK Cast initialisé.");
@@ -83,7 +82,7 @@ export default function Home() {
     };
   }, []);
 
-  // Lorsque nowPlaying est mis à jour, charge le flux audio s'il existe
+  // Charge le flux audio lorsqu'une nouvelle URL est disponible
   useEffect(() => {
     if (nowPlaying && nowPlaying.station && nowPlaying.station.listen_url) {
       const audioEl = document.getElementById('audio-player');
@@ -99,7 +98,18 @@ export default function Home() {
     }
   }, [nowPlaying]);
 
-  // Extraction des informations à afficher
+  // Met à jour le volume de l'élément audio
+  useEffect(() => {
+    const audioEl = document.getElementById('audio-player');
+    if (audioEl) {
+      audioEl.volume = volume;
+    }
+  }, [volume]);
+
+  const handleVolumeChange = (e) => {
+    setVolume(parseFloat(e.target.value));
+  };
+
   const station = nowPlaying?.station || { name: "Radio", listen_url: null };
   const currentSong = nowPlaying?.now_playing?.song || null;
 
@@ -124,6 +134,20 @@ export default function Home() {
           <h2 className="text-xl text-center mb-4">En attente...</h2>
         )}
         {error && <p className="text-red-500 text-center mt-4">{error}</p>}
+        {/* Contrôle du volume */}
+        <div className="mt-6">
+          <label htmlFor="volume" className="block text-center mb-2">Volume</label>
+          <input
+            id="volume"
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={volume}
+            onChange={handleVolumeChange}
+            className="w-full"
+          />
+        </div>
       </div>
       {/* Élément audio caché pour jouer le flux */}
       <audio id="audio-player" autoPlay className="hidden"></audio>
