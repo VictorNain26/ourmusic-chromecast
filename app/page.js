@@ -5,7 +5,7 @@ export default function Home() {
   const [nowPlaying, setNowPlaying] = useState(null);
   const [error, setError] = useState('');
 
-  // Met à jour les métadonnées reçues via SSE
+  // Mise à jour des métadonnées reçues via SSE
   const updateNowPlaying = (npData) => {
     setNowPlaying(npData);
   };
@@ -61,7 +61,7 @@ export default function Home() {
     };
   }, []);
 
-  // Charge le flux audio lorsque l'URL est mise à jour
+  // Charge le flux audio dès qu'une nouvelle URL est disponible
   useEffect(() => {
     if (nowPlaying && nowPlaying.station && nowPlaying.station.listen_url) {
       const audioEl = document.getElementById('audio-player');
@@ -80,27 +80,35 @@ export default function Home() {
 
   return (
     <div className="relative min-h-screen flex items-center justify-center">
-      {/* Fond avec l'image de l'album (flou et atténué) */}
+      {/* Image d'album en fond, avec flou */}
       {currentSong?.art && (
         <div 
           className="absolute inset-0 bg-cover bg-center filter blur-lg"
           style={{ backgroundImage: `url(${currentSong.art})` }}
         ></div>
       )}
-      {/* Overlay sombre */}
-      <div className="absolute inset-0 bg-black opacity-60"></div>
+      {/* Overlay noir plus transparent */}
+      <div className="absolute inset-0 bg-black opacity-40"></div>
 
       {/* Contenu principal */}
       <div className="relative z-10 w-full max-w-2xl bg-gray-800 rounded-lg shadow-lg p-8">
         <div className="mb-6 text-center">
           <h1 className="text-5xl font-bold text-white">{station.name}</h1>
         </div>
-        <div className="mb-6">
+        <div className="mb-6 text-center">
           {currentSong ? (
             <div className="flex flex-col items-center">
-              <h2 className="text-2xl font-semibold text-white mb-2">
+              <h2 className="text-2xl font-semibold text-white mb-4">
                 {currentSong.artist} - {currentSong.title}
               </h2>
+              {/* Image d'album affichée dans la carte */}
+              {currentSong.art && (
+                <img 
+                  src={currentSong.art} 
+                  alt={`${currentSong.artist} - ${currentSong.title}`} 
+                  className="w-64 rounded-lg shadow-md mx-auto" 
+                />
+              )}
             </div>
           ) : (
             <div className="text-center">
