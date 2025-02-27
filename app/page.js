@@ -4,48 +4,26 @@ import { useEffect, useState } from 'react';
 export default function Home() {
   const [nowPlaying, setNowPlaying] = useState(null);
   const [error, setError] = useState('');
-  const [volume, setVolume] = useState(1);
 
   // Met à jour les métadonnées reçues via SSE
   const updateNowPlaying = (npData) => {
     setNowPlaying(npData);
   };
 
-  // Initialisation du Cast Receiver SDK
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js';
-    script.async = true;
-    script.onload = () => {
-      const context = window.cast.framework.CastReceiverContext.getInstance();
-      const playerManager = context.getPlayerManager();
-      // Intercepteur sur le message LOAD (optionnel)
-      playerManager.setMessageInterceptor(
-        window.cast.framework.messages.MessageType.LOAD,
-        (request) => request
-      );
-      context.start();
-      console.log("SDK Cast initialisé.");
-    };
-    document.body.appendChild(script);
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, []);
-
-  // Connexion SSE à AzuraCast pour recevoir les données en temps réel
+  // Connexion SSE à AzuraCast pour récupérer les données en temps réel
   useEffect(() => {
     const sseUrl = "https://ourmusic-azuracast.ovh/api/live/nowplaying/sse";
     const sseUriParams = new URLSearchParams({
       cf_connect: JSON.stringify({ subs: { "station:ourmusic": { recover: true } } })
     });
     const fullUrl = `${sseUrl}?${sseUriParams.toString()}`;
-
     const sse = new EventSource(fullUrl);
+
     sse.onopen = () => {
       console.log("Connexion SSE établie vers AzuraCast.");
       setError('');
     };
+
     sse.onmessage = (event) => {
       if (event.data.trim() === '.') return;
       try {
@@ -71,6 +49,7 @@ export default function Home() {
         console.error("Erreur lors du parsing SSE :", err);
       }
     };
+
     sse.onerror = (err) => {
       console.error("Erreur SSE :", err);
       setError("Erreur de connexion SSE.");
@@ -82,73 +61,56 @@ export default function Home() {
     };
   }, []);
 
-  // Charge le flux audio lorsqu'une nouvelle URL est disponible
+  // Charge le flux audio lorsque l'URL est mise à jour
   useEffect(() => {
     if (nowPlaying && nowPlaying.station && nowPlaying.station.listen_url) {
       const audioEl = document.getElementById('audio-player');
-      if (audioEl) {
-        if (audioEl.src !== nowPlaying.station.listen_url) {
-          audioEl.src = nowPlaying.station.listen_url;
-          audioEl.load();
-          audioEl.play().catch((err) => {
-            console.error("Erreur lors de la lecture du flux audio :", err);
-          });
-        }
+      if (audioEl && audioEl.src !== nowPlaying.station.listen_url) {
+        audioEl.src = nowPlaying.station.listen_url;
+        audioEl.load();
+        audioEl.play().catch((err) => {
+          console.error("Erreur lors de la lecture du flux audio :", err);
+        });
       }
     }
   }, [nowPlaying]);
-
-  // Met à jour le volume de l'élément audio
-  useEffect(() => {
-    const audioEl = document.getElementById('audio-player');
-    if (audioEl) {
-      audioEl.volume = volume;
-    }
-  }, [volume]);
-
-  const handleVolumeChange = (e) => {
-    setVolume(parseFloat(e.target.value));
-  };
 
   const station = nowPlaying?.station || { name: "Radio", listen_url: null };
   const currentSong = nowPlaying?.now_playing?.song || null;
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center px-4">
-      <div className="w-full max-w-lg bg-gray-800 p-6 rounded-lg shadow-lg">
-        <h1 className="text-4xl font-bold mb-4 text-center">{station.name}</h1>
-        {currentSong ? (
-          <div className="text-center">
-            <h2 className="text-2xl font-semibold mb-2">
-              En cours : {currentSong.artist} - {currentSong.title}
-            </h2>
-            {currentSong.art && (
-              <img 
-                src={currentSong.art} 
-                alt={`${currentSong.artist} - ${currentSong.title}`} 
-                className="mx-auto rounded-lg max-w-xs mb-4" 
-              />
-            )}
-          </div>
-        ) : (
-          <h2 className="text-xl text-center mb-4">En attente...</h2>
-        )}
-        {error && <p className="text-red-500 text-center mt-4">{error}</p>}
-        {/* Contrôle du volume */}
-        <div className="mt-6">
-          <label htmlFor="volume" className="block text-center mb-2">Volume</label>
-          <input
-            id="volume"
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={volume}
-            onChange={handleVolumeChange}
-            className="w-full"
-          />
+    <div className="relative min-h-screen flex items-center justify-center">
+      {/* Fond avec l'image de l'album (flou et atténué) */}
+      {currentSong?.art && (
+        <div 
+          className="absolute inset-0 bg-cover bg-center filter blur-lg"
+          style={{ backgroundImage: `url(${currentSong.art})` }}
+        ></div>
+      )}
+      {/* Overlay sombre */}
+      <div className="absolute inset-0 bg-black opacity-60"></div>
+
+      {/* Contenu principal */}
+      <div className="relative z-10 w-full max-w-2xl bg-gray-800 rounded-lg shadow-lg p-8">
+        <div className="mb-6 text-center">
+          <h1 className="text-5xl font-bold text-white">{station.name}</h1>
         </div>
+        <div className="mb-6">
+          {currentSong ? (
+            <div className="flex flex-col items-center">
+              <h2 className="text-2xl font-semibold text-white mb-2">
+                {currentSong.artist} - {currentSong.title}
+              </h2>
+            </div>
+          ) : (
+            <div className="text-center">
+              <h2 className="text-2xl text-gray-300">En attente...</h2>
+            </div>
+          )}
+        </div>
+        {error && <div className="text-red-500 text-center mb-4">{error}</div>}
       </div>
+
       {/* Élément audio caché pour jouer le flux */}
       <audio id="audio-player" autoPlay className="hidden"></audio>
     </div>
