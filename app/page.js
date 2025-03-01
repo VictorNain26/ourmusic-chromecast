@@ -10,54 +10,70 @@ export default function Home() {
     setNowPlaying(npData);
   };
 
-  // Connexion SSE à AzuraCast pour récupérer les données en temps réel
+  // Connexion SSE à AzuraCast avec reconnexion automatique
   useEffect(() => {
     const sseUrl = "https://ourmusic-azuracast.ovh/api/live/nowplaying/sse";
     const sseUriParams = new URLSearchParams({
       cf_connect: JSON.stringify({ subs: { "station:ourmusic": { recover: true } } })
     });
     const fullUrl = `${sseUrl}?${sseUriParams.toString()}`;
-    const sse = new EventSource(fullUrl);
 
-    sse.onopen = () => {
-      console.log("Connexion SSE établie vers AzuraCast.");
-      setError('');
-    };
+    let sse;
+    let reconnectTimeout;
 
-    sse.onmessage = (event) => {
-      if (event.data.trim() === '.') return;
-      try {
-        const jsonData = JSON.parse(event.data);
-        if (jsonData.connect) {
-          if (jsonData.connect.data && Array.isArray(jsonData.connect.data)) {
-            jsonData.connect.data.forEach(row => {
-              if (row.np) updateNowPlaying(row.np);
-            });
-          } else if (jsonData.connect.subs) {
-            Object.values(jsonData.connect.subs).forEach(sub => {
-              if (sub.publications && sub.publications.length > 0) {
-                sub.publications.forEach(pub => {
-                  if (pub.data && pub.data.np) updateNowPlaying(pub.data.np);
-                });
-              }
-            });
+    const connectSSE = () => {
+      sse = new EventSource(fullUrl);
+
+      sse.onopen = () => {
+        console.log("Connexion SSE établie vers AzuraCast.");
+        setError('');
+      };
+
+      sse.onmessage = (event) => {
+        if (event.data.trim() === '.') return;
+        try {
+          const jsonData = JSON.parse(event.data);
+          if (jsonData.connect) {
+            if (jsonData.connect.data && Array.isArray(jsonData.connect.data)) {
+              jsonData.connect.data.forEach(row => {
+                if (row.np) updateNowPlaying(row.np);
+              });
+            } else if (jsonData.connect.subs) {
+              Object.values(jsonData.connect.subs).forEach(sub => {
+                if (sub.publications && sub.publications.length > 0) {
+                  sub.publications.forEach(pub => {
+                    if (pub.data && pub.data.np) updateNowPlaying(pub.data.np);
+                  });
+                }
+              });
+            }
+          } else if (jsonData.pub) {
+            if (jsonData.pub.data && jsonData.pub.data.np) updateNowPlaying(jsonData.pub.data.np);
           }
-        } else if (jsonData.pub) {
-          if (jsonData.pub.data && jsonData.pub.data.np) updateNowPlaying(jsonData.pub.data.np);
+        } catch (err) {
+          console.error("Erreur lors du parsing SSE :", err);
         }
-      } catch (err) {
-        console.error("Erreur lors du parsing SSE :", err);
-      }
+      };
+
+      sse.onerror = (err) => {
+        console.error("Erreur SSE :", err);
+        setError("Erreur de connexion SSE. Tentative de reconnexion...");
+        sse.close();
+        // Tentative de reconnexion après 3 secondes
+        reconnectTimeout = setTimeout(() => {
+          console.log("Tentative de reconnexion SSE...");
+          connectSSE();
+        }, 3000);
+      };
     };
 
-    sse.onerror = (err) => {
-      console.error("Erreur SSE :", err);
-      setError("Erreur de connexion SSE.");
-      sse.close();
-    };
+    // Initialisation de la connexion SSE
+    connectSSE();
 
+    // Nettoyage à la destruction du composant
     return () => {
-      sse.close();
+      if (sse) sse.close();
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
     };
   }, []);
 
