@@ -1,22 +1,22 @@
-"use client"
-import { useEffect, useState } from 'react';
+"use client";
+import { useEffect, useState } from "react";
 
 export default function Home() {
   const [nowPlaying, setNowPlaying] = useState(null);
-  const [loading, setLoading] = useState(true);  // Ajout d'un état de chargement
-  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  // Mise à jour des métadonnées reçues via SSE
+  // Met à jour les métadonnées reçues via SSE
   const updateNowPlaying = (npData) => {
     setNowPlaying(npData);
-    setLoading(false);  // Mettre à jour l'état de chargement une fois les données reçues
+    setLoading(false);
   };
 
   // Connexion SSE à AzuraCast avec reconnexion automatique
   useEffect(() => {
     const sseUrl = "https://ourmusic-azuracast.ovh/api/live/nowplaying/sse";
     const sseUriParams = new URLSearchParams({
-      cf_connect: JSON.stringify({ subs: { "station:ourmusic": { recover: true } } })
+      cf_connect: JSON.stringify({ subs: { "station:ourmusic": { recover: true } } }),
     });
     const fullUrl = `${sseUrl}?${sseUriParams.toString()}`;
 
@@ -28,22 +28,23 @@ export default function Home() {
 
       sse.onopen = () => {
         console.log("Connexion SSE établie vers AzuraCast.");
-        setError('');
+        setError("");
       };
 
       sse.onmessage = (event) => {
-        if (event.data.trim() === '.') return;
+        if (event.data.trim() === ".") return; // Ignorer les keep-alive ponctuels
         try {
           const jsonData = JSON.parse(event.data);
+          console.log("Données reçues via SSE :", jsonData);
           if (jsonData.connect) {
             if (jsonData.connect.data && Array.isArray(jsonData.connect.data)) {
-              jsonData.connect.data.forEach(row => {
+              jsonData.connect.data.forEach((row) => {
                 if (row.np) updateNowPlaying(row.np);
               });
             } else if (jsonData.connect.subs) {
-              Object.values(jsonData.connect.subs).forEach(sub => {
+              Object.values(jsonData.connect.subs).forEach((sub) => {
                 if (sub.publications && sub.publications.length > 0) {
-                  sub.publications.forEach(pub => {
+                  sub.publications.forEach((pub) => {
                     if (pub.data && pub.data.np) updateNowPlaying(pub.data.np);
                   });
                 }
@@ -61,7 +62,7 @@ export default function Home() {
         console.error("Erreur SSE :", err);
         setError("Erreur de connexion SSE. Tentative de reconnexion...");
         sse.close();
-        // Tentative de reconnexion après 3 secondes
+        // Reconnexion après 3 secondes
         reconnectTimeout = setTimeout(() => {
           console.log("Tentative de reconnexion SSE...");
           connectSSE();
@@ -69,26 +70,25 @@ export default function Home() {
       };
     };
 
-    // Initialisation de la connexion SSE
     connectSSE();
 
-    // Nettoyage à la destruction du composant
+    // Nettoyage lors de la destruction du composant
     return () => {
       if (sse) sse.close();
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
     };
   }, []);
 
-  // Charge le flux audio dès qu'une nouvelle URL est disponible
+  // Mise à jour du flux audio dès qu'une nouvelle URL est disponible
   useEffect(() => {
     if (nowPlaying && nowPlaying.station && nowPlaying.station.listen_url) {
-      const audioEl = document.getElementById('audio-player');
+      const audioEl = document.getElementById("audio-player");
       if (audioEl && audioEl.src !== nowPlaying.station.listen_url) {
         audioEl.src = nowPlaying.station.listen_url;
         audioEl.load();
-        audioEl.play().catch((err) => {
-          console.error("Erreur lors de la lecture du flux audio :", err);
-        });
+        audioEl
+          .play()
+          .catch((err) => console.error("Erreur lors de la lecture du flux audio :", err));
       }
     }
   }, [nowPlaying]);
@@ -100,7 +100,7 @@ export default function Home() {
     <div className="relative min-h-screen flex items-center justify-center">
       {/* Image d'album en fond, avec flou */}
       {currentSong?.art && (
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center filter blur-lg"
           style={{ backgroundImage: `url(${currentSong.art})` }}
         ></div>
@@ -116,7 +116,6 @@ export default function Home() {
         <div className="mb-6 text-center">
           {loading ? (
             <div className="flex flex-col items-center justify-center">
-              {/* Spinner Tailwind */}
               <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white"></div>
               <p className="text-white mt-4">Chargement...</p>
             </div>
@@ -125,12 +124,11 @@ export default function Home() {
               <h2 className="text-2xl font-semibold text-white mb-4">
                 {currentSong.artist} - {currentSong.title}
               </h2>
-              {/* Image d'album affichée dans la carte */}
               {currentSong.art && (
-                <img 
-                  src={currentSong.art} 
-                  alt={`${currentSong.artist} - ${currentSong.title}`} 
-                  className="w-64 rounded-lg shadow-md mx-auto" 
+                <img
+                  src={currentSong.art}
+                  alt={`${currentSong.artist} - ${currentSong.title}`}
+                  className="w-64 rounded-lg shadow-md mx-auto"
                 />
               )}
             </div>

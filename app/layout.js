@@ -21,46 +21,31 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
-        {/* Chargement du SDK Cast Receiver Framework */}
+        {/* Chargement du SDK Cast Receiver et initialisation via onLoad */}
         <Script
           src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"
           strategy="beforeInteractive"
-        />
-        {/* Initialisation du Cast Receiver dès le chargement avec timeout et heartbeats */}
-        <Script
-          id="cast-init"
-          strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `
-              window.addEventListener('load', function() {
-                const context = cast.framework.CastReceiverContext.getInstance();
-                // Facultatif : configurer le niveau de log pour le debugging
-                context.setLoggerLevel(cast.framework.LoggerLevel.DEBUG);
-                context.setInactivityTimeout(6000); // Timeout étendu à 100 minutes
-                context.start();
-                console.log("Cast Receiver démarré avec timeout d'inactivité étendu");
-              });
-            `,
-          }}
-        />
-        {/* Heartbeat pour maintenir la session active */}
-        <Script
-          id="cast-heartbeat"
-          strategy="lazyOnload"
-          dangerouslySetInnerHTML={{
-            __html: `
-              window.addEventListener('load', function() {
-                const context = cast.framework.CastReceiverContext.getInstance();
-                const interval = 30000; // Heartbeat toutes les 30 secondes
+          onLoad={() => {
+            if (typeof cast !== "undefined" && cast.framework) {
+              const context = cast.framework.CastReceiverContext.getInstance();
+              context.setLoggerLevel(cast.framework.LoggerLevel.DEBUG);
+              context.setInactivityTimeout(6000); // Timeout étendu à 100 minutes
+              context.start();
+              console.log("Cast Receiver initialisé avec timeout d'inactivité étendu.");
 
-                setInterval(() => {
-                  context.sendCustomMessage('urn:x-cast:com.google.cast.sample.heartbeat', undefined, {
-                    type: 'HEARTBEAT'
-                  });
-                  console.log('Heartbeat envoyé');
-                }, interval);
-              });
-            `,
+              // Envoi d'un heartbeat toutes les 10 secondes pour maintenir la session active
+              const heartbeatInterval = 10000; // 10 secondes
+              setInterval(() => {
+                context.sendCustomMessage(
+                  "urn:x-cast:com.google.cast.sample.heartbeat",
+                  undefined,
+                  { type: "HEARTBEAT" }
+                );
+                console.log("Heartbeat envoyé");
+              }, heartbeatInterval);
+            } else {
+              console.error("Le SDK Cast n'est pas disponible.");
+            }
           }}
         />
       </head>
