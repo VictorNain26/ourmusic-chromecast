@@ -26,8 +26,8 @@ export default function RootLayout({ children }) {
           src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"
           strategy="beforeInteractive"
         />
-        {/* Initialisation du Cast Receiver et heartbeat en script inline */}
-        <Script id="cast-init-and-heartbeat" strategy="beforeInteractive">
+        {/* Initialisation du Cast Receiver et envoi des messages heartbeat et keep-alive */}
+        <Script id="cast-init-and-keepalive" strategy="beforeInteractive">
           {`
             window.addEventListener('load', function() {
               if (typeof cast !== "undefined" && cast.framework) {
@@ -35,16 +35,32 @@ export default function RootLayout({ children }) {
                 context.setLoggerLevel(cast.framework.LoggerLevel.DEBUG);
                 context.setInactivityTimeout(6000); // Timeout étendu à 100 minutes
                 context.start();
-                console.log("Cast Receiver initialisé avec timeout d'inactivité étendu.");
+                console.log("Cast Receiver initialisé.");
 
-                // Envoi d'un heartbeat toutes les 10 secondes pour maintenir la session active
-                setInterval(() => {
+                // Fonction d'envoi du heartbeat
+                const sendHeartbeat = () => {
                   context.sendCustomMessage(
                     "urn:x-cast:com.google.cast.sample.heartbeat",
                     undefined,
                     { type: "HEARTBEAT" }
                   );
                   console.log("Heartbeat envoyé");
+                };
+
+                // Fonction d'envoi du keep-alive
+                const sendKeepAlive = () => {
+                  context.sendCustomMessage(
+                    "urn:x-cast:com.google.cast.sample.keepalive",
+                    undefined,
+                    { type: "KEEP_ALIVE" }
+                  );
+                  console.log("Keep-alive envoyé");
+                };
+
+                // Envoi des messages toutes les 10 secondes
+                setInterval(() => {
+                  sendHeartbeat();
+                  sendKeepAlive();
                 }, 10000);
               } else {
                 console.error("Le SDK Cast n'est pas disponible.");
