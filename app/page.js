@@ -32,7 +32,6 @@ export default function Home() {
       };
 
       sse.onmessage = (event) => {
-        if (event.data.trim() === ".") return; // Ignorer les keep-alive ponctuels
         try {
           const jsonData = JSON.parse(event.data);
           console.log("Données reçues via SSE :", jsonData);
