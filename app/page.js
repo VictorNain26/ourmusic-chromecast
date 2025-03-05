@@ -3,11 +3,13 @@ import { useEffect, useState } from 'react';
 
 export default function Home() {
   const [nowPlaying, setNowPlaying] = useState(null);
+  const [loading, setLoading] = useState(true);  // Ajout d'un état de chargement
   const [error, setError] = useState('');
 
   // Mise à jour des métadonnées reçues via SSE
   const updateNowPlaying = (npData) => {
     setNowPlaying(npData);
+    setLoading(false);  // Mettre à jour l'état de chargement une fois les données reçues
   };
 
   // Connexion SSE à AzuraCast avec reconnexion automatique
@@ -112,7 +114,13 @@ export default function Home() {
           <h1 className="text-5xl font-bold text-white">{station.name}</h1>
         </div>
         <div className="mb-6 text-center">
-          {currentSong ? (
+          {loading ? (
+            <div className="flex flex-col items-center justify-center">
+              {/* Spinner Tailwind */}
+              <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white"></div>
+              <p className="text-white mt-4">Chargement...</p>
+            </div>
+          ) : currentSong ? (
             <div className="flex flex-col items-center">
               <h2 className="text-2xl font-semibold text-white mb-4">
                 {currentSong.artist} - {currentSong.title}
