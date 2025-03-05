@@ -32,6 +32,7 @@ export default function Home() {
       };
 
       sse.onmessage = (event) => {
+        if (event.data.trim() === ".") return; // Ignorer les keep-alive ponctuels
         try {
           const jsonData = JSON.parse(event.data);
           console.log("Données reçues via SSE :", jsonData);
@@ -50,7 +51,8 @@ export default function Home() {
               });
             }
           } else if (jsonData.pub) {
-            if (jsonData.pub.data && jsonData.pub.data.np) updateNowPlaying(jsonData.pub.data.np);
+            if (jsonData.pub.data && jsonData.pub.data.np)
+              updateNowPlaying(jsonData.pub.data.np);
           }
         } catch (err) {
           console.error("Erreur lors du parsing SSE :", err);
@@ -87,7 +89,9 @@ export default function Home() {
         audioEl.load();
         audioEl
           .play()
-          .catch((err) => console.error("Erreur lors de la lecture du flux audio :", err));
+          .catch((err) =>
+            console.error("Erreur lors de la lecture du flux audio :", err)
+          );
       }
     }
   }, [nowPlaying]);
