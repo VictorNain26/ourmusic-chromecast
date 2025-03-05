@@ -107,7 +107,7 @@ export default function Home() {
       <div className="absolute inset-0 bg-black opacity-40"></div>
 
       {/* Contenu principal */}
-      <div className="relative z-10 w-full max-w-2xl bg-gray-800 rounded-lg shadow-lg p-8">
+      <div className="relative z-10">
         <div className="mb-6 text-center">
           <h1 className="text-5xl font-bold text-white">{station.name}</h1>
         </div>
