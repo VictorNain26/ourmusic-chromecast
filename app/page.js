@@ -71,6 +71,15 @@ export default function Home() {
       };
     };
 
+    // Watchdog SSE : vérifie régulièrement que le flux vit
+    setInterval(() => {
+      if (sse && sse.readyState !== EventSource.OPEN) {
+        console.warn("⚠️ SSE semble fermé, tentative de reconnexion...");
+        sse.close();
+        connectSSE();
+      }
+    }, 15000); // Toutes les 15 secondes, check de la connexion
+
     connectSSE();
 
     // Nettoyage lors de la destruction du composant

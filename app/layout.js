@@ -21,27 +21,34 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
-        {/* Chargement du SDK Cast Receiver avant interactivité */}
+        {/* SDK Cast Receiver Framework */}
         <Script
           src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"
           strategy="beforeInteractive"
         />
-        {/* Initialisation du Cast Receiver + protection contre idle timeout */}
+        {/* Initialisation Chromecast */}
         <Script id="cast-init" strategy="afterInteractive">
           {`
             (function initCast() {
               function startCast() {
                 if (typeof cast !== "undefined" && cast.framework) {
                   const context = cast.framework.CastReceiverContext.getInstance();
-                  context.setLoggerLevel(cast.framework.LoggerLevel.DEBUG);
+                  context.setLoggerLevel(cast.framework.LoggerLevel.WARNING); // Log minimal
 
-                  // ✅ Désactiver la coupure automatique après 5 minutes
+                  // ✅ Désactiver le timeout standard
                   context.setInactivityTimeout(0);
 
+                  // ✅ Enregistrement d'un faux media pour empêcher l'idle timeout
+                  const playerManager = context.getPlayerManager();
+                  playerManager.setMediaPlaybackInfo({
+                    autoResumeDuration: 3600, // 1 heure
+                    autoResumeEnabled: true,
+                  });
+
                   context.start();
-                  console.log("✅ Cast Receiver initialisé.");
+                  console.log("✅ Cast Receiver initialisé avec protection anti-coupure.");
                 } else {
-                  console.error("❌ Le SDK Cast n'est pas disponible.");
+                  console.error("❌ SDK Cast non disponible.");
                 }
               }
 
