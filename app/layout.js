@@ -21,25 +21,26 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
-        {/* Chargement du SDK Chromecast */}
         <Script
           src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"
           strategy="beforeInteractive"
         />
-        {/* Init Cast Receiver sans erreur */}
         <Script id="cast-init" strategy="afterInteractive">
           {`
             (function initCast() {
               function startCast() {
-                if (window.cast?.framework) {
+                if (window.cast && cast.framework) {
                   const context = cast.framework.CastReceiverContext.getInstance();
+                  const playerManager = context.getPlayerManager();
+                  // Initialisation complète du framework pour empêcher l’Idle Timeout
                   context.setLoggerLevel(cast.framework.LoggerLevel.DEBUG);
                   context.start();
                   console.log("✅ Cast Receiver initialisé.");
                 } else {
-                  console.error("❌ Le SDK Cast n'est pas disponible.");
+                  console.error("❌ SDK Cast non disponible.");
                 }
               }
+
               if (document.readyState === 'complete') {
                 startCast();
               } else {
