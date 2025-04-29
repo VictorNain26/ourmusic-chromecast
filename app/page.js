@@ -1,107 +1,79 @@
 "use client";
-import { useEffect, useState } from "react";
+
+import { useEffect, useState, useRef } from "react";
 
 export default function Home() {
   const [nowPlaying, setNowPlaying] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const sseRef = useRef(null);
+  const reconnectTimeoutRef = useRef(null);
+  const audioRef = useRef(null);
 
-  // Met à jour les métadonnées reçues via SSE
-  const updateNowPlaying = (npData) => {
-    setNowPlaying(npData);
-    setLoading(false);
-  };
-
-  // Connexion SSE à AzuraCast avec reconnexion automatique
-  useEffect(() => {
+  // Fonction pour connecter le SSE
+  const connectSSE = () => {
     const sseUrl = "https://ourmusic-azuracast.ovh/api/live/nowplaying/sse";
-    const sseUriParams = new URLSearchParams({
+    const sseParams = new URLSearchParams({
       cf_connect: JSON.stringify({ subs: { "station:ourmusic": { recover: true } } }),
     });
-    const fullUrl = `${sseUrl}?${sseUriParams.toString()}`;
+    const fullUrl = `${sseUrl}?${sseParams.toString()}`;
 
-    let sse;
-    let reconnectTimeout;
+    const sse = new EventSource(fullUrl);
+    sseRef.current = sse;
 
-    const connectSSE = () => {
-      sse = new EventSource(fullUrl);
-
-      sse.onopen = () => {
-        console.log("Connexion SSE établie vers AzuraCast.");
-        setError("");
-      };
-
-      sse.onmessage = (event) => {
-        if (event.data.trim() === ".") return; // Ignorer les keep-alive ponctuels
-        try {
-          const jsonData = JSON.parse(event.data);
-          console.log("Données reçues via SSE :", jsonData);
-          if (jsonData.connect) {
-            if (jsonData.connect.data && Array.isArray(jsonData.connect.data)) {
-              jsonData.connect.data.forEach((row) => {
-                if (row.np) updateNowPlaying(row.np);
-              });
-            } else if (jsonData.connect.subs) {
-              Object.values(jsonData.connect.subs).forEach((sub) => {
-                if (sub.publications && sub.publications.length > 0) {
-                  sub.publications.forEach((pub) => {
-                    if (pub.data && pub.data.np) updateNowPlaying(pub.data.np);
-                  });
-                }
-              });
-            }
-          } else if (jsonData.pub) {
-            if (jsonData.pub.data && jsonData.pub.data.np)
-              updateNowPlaying(jsonData.pub.data.np);
-          }
-        } catch (err) {
-          console.error("Erreur lors du parsing SSE :", err);
-        }
-      };
-
-      sse.onerror = (err) => {
-        console.error("Erreur SSE :", err);
-        setError("Erreur de connexion SSE. Tentative de reconnexion...");
-        sse.close();
-        // Reconnexion après 3 secondes
-        reconnectTimeout = setTimeout(() => {
-          console.log("Tentative de reconnexion SSE...");
-          connectSSE();
-        }, 3000);
-      };
+    sse.onopen = () => {
+      console.log("✅ Connexion SSE établie.");
+      setError("");
     };
 
-    // Watchdog SSE : vérifie régulièrement que le flux vit
-    setInterval(() => {
-      if (sse && sse.readyState !== EventSource.OPEN) {
-        console.warn("⚠️ SSE semble fermé, tentative de reconnexion...");
-        sse.close();
-        connectSSE();
+    sse.onmessage = (event) => {
+      if (event.data.trim() === ".") return; // Keep-alive
+      try {
+        const jsonData = JSON.parse(event.data);
+        if (jsonData.connect) {
+          const rows = jsonData.connect.data || [];
+          rows.forEach((row) => {
+            if (row.np) setNowPlaying(row.np);
+          });
+        } else if (jsonData.pub && jsonData.pub.data?.np) {
+          setNowPlaying(jsonData.pub.data.np);
+        }
+      } catch (err) {
+        console.error("❌ Erreur parsing SSE :", err);
       }
-    }, 15000); // Toutes les 15 secondes, check de la connexion
+    };
 
+    sse.onerror = () => {
+      console.error("❌ Erreur SSE, tentative de reconnexion...");
+      setError("Erreur de connexion SSE.");
+      sse.close();
+      reconnectTimeoutRef.current = setTimeout(() => {
+        connectSSE();
+      }, 3000);
+    };
+  };
+
+  // Connexion SSE au montage
+  useEffect(() => {
     connectSSE();
-
-    // Nettoyage lors de la destruction du composant
     return () => {
-      if (sse) sse.close();
-      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (sseRef.current) sseRef.current.close();
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
     };
   }, []);
 
-  // Mise à jour du flux audio dès qu'une nouvelle URL est disponible
+  // Mise à jour de l'audio
   useEffect(() => {
-    if (nowPlaying && nowPlaying.station && nowPlaying.station.listen_url) {
-      const audioEl = document.getElementById("audio-player");
-      if (audioEl && audioEl.src !== nowPlaying.station.listen_url) {
+    if (nowPlaying?.station?.listen_url && audioRef.current) {
+      const audioEl = audioRef.current;
+      if (audioEl.src !== nowPlaying.station.listen_url) {
         audioEl.src = nowPlaying.station.listen_url;
         audioEl.load();
-        audioEl
-          .play()
-          .catch((err) =>
-            console.error("Erreur lors de la lecture du flux audio :", err)
-          );
+        audioEl.play().catch((err) => {
+          console.error("❌ Erreur lecture flux audio :", err);
+        });
       }
+      setLoading(false);
     }
   }, [nowPlaying]);
 
@@ -110,51 +82,49 @@ export default function Home() {
 
   return (
     <div className="relative min-h-screen flex items-center justify-center">
-      {/* Image d'album en fond, avec flou */}
+      {/* Fond flouté */}
       {currentSong?.art && (
         <div
           className="absolute inset-0 bg-cover bg-center filter blur-lg"
           style={{ backgroundImage: `url(${currentSong.art})` }}
         ></div>
       )}
-      {/* Overlay noir plus transparent */}
+      {/* Overlay */}
       <div className="absolute inset-0 bg-black opacity-40"></div>
 
-      {/* Contenu principal */}
-      <div className="relative z-10">
-        <div className="mb-6 text-center">
-          <h1 className="text-5xl font-bold text-white">{station.name}</h1>
-        </div>
-        <div className="mb-6 text-center">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center">
-              <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white"></div>
-              <p className="text-white mt-4">Chargement...</p>
-            </div>
-          ) : currentSong ? (
-            <div className="flex flex-col items-center">
-              <h2 className="text-2xl font-semibold text-white mb-4">
-                {currentSong.artist} - {currentSong.title}
-              </h2>
-              {currentSong.art && (
-                <img
-                  src={currentSong.art}
-                  alt={`${currentSong.artist} - ${currentSong.title}`}
-                  className="w-64 rounded-lg shadow-md mx-auto"
-                />
-              )}
-            </div>
-          ) : (
-            <div className="text-center">
-              <h2 className="text-2xl text-gray-300">En attente...</h2>
-            </div>
-          )}
-        </div>
-        {error && <div className="text-red-500 text-center mb-4">{error}</div>}
+      {/* Contenu */}
+      <div className="relative z-10 text-center">
+        <h1 className="text-5xl font-bold text-white mb-8">{station.name}</h1>
+
+        {loading ? (
+          <div className="flex flex-col items-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white"></div>
+            <p className="text-white mt-4">Chargement...</p>
+          </div>
+        ) : currentSong ? (
+          <div className="flex flex-col items-center">
+            <h2 className="text-2xl font-semibold text-white mb-4">
+              {currentSong.artist} - {currentSong.title}
+            </h2>
+            {currentSong.art && (
+              <img
+                src={currentSong.art}
+                alt={`${currentSong.artist} - ${currentSong.title}`}
+                className="w-64 rounded-lg shadow-md"
+              />
+            )}
+          </div>
+        ) : (
+          <p className="text-2xl text-gray-300">En attente...</p>
+        )}
+
+        {error && (
+          <p className="text-red-500 mt-6">{error}</p>
+        )}
       </div>
 
-      {/* Élément audio caché pour jouer le flux */}
-      <audio id="audio-player" autoPlay className="hidden"></audio>
+      {/* Audio player caché */}
+      <audio ref={audioRef} autoPlay className="hidden"></audio>
     </div>
   );
 }
