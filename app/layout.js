@@ -21,12 +21,12 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
-        {/* Chargement du SDK Cast Receiver avant l'interactivité */}
+        {/* Chargement du SDK Cast Receiver avant interactivité */}
         <Script
           src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"
           strategy="beforeInteractive"
         />
-        {/* Initialisation du Cast Receiver après l'interactivité */}
+        {/* Initialisation du Cast Receiver + protection contre idle timeout */}
         <Script id="cast-init" strategy="afterInteractive">
           {`
             (function initCast() {
@@ -34,14 +34,17 @@ export default function RootLayout({ children }) {
                 if (typeof cast !== "undefined" && cast.framework) {
                   const context = cast.framework.CastReceiverContext.getInstance();
                   context.setLoggerLevel(cast.framework.LoggerLevel.DEBUG);
+
+                  // ✅ Désactiver la coupure automatique après 5 minutes
+                  context.setInactivityTimeout(0);
+
                   context.start();
-                  console.log("Cast Receiver initialisé.");
+                  console.log("✅ Cast Receiver initialisé.");
                 } else {
-                  console.error("Le SDK Cast n'est pas disponible.");
+                  console.error("❌ Le SDK Cast n'est pas disponible.");
                 }
               }
 
-              // Vérification de l'état du document
               if (document.readyState === 'complete') {
                 startCast();
               } else {
