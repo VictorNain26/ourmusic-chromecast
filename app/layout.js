@@ -25,17 +25,18 @@ export default function RootLayout({ children }) {
           src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"
           strategy="beforeInteractive"
         />
+
         <Script id="cast-init" strategy="afterInteractive">
           {`
             (function initCast() {
               function startCast() {
-                if (window.cast && cast.framework) {
+                if (typeof cast !== "undefined" && cast.framework) {
                   const context = cast.framework.CastReceiverContext.getInstance();
-                  const playerManager = context.getPlayerManager();
-                  // Initialisation complète du framework pour empêcher l’Idle Timeout
+                  const options = new cast.framework.CastReceiverOptions();
+                  options.disableIdleTimeout = true;
                   context.setLoggerLevel(cast.framework.LoggerLevel.DEBUG);
-                  context.start();
-                  console.log("✅ Cast Receiver initialisé.");
+                  context.start(options);
+                  console.log("✅ Cast Receiver initialisé avec idle timeout désactivé.");
                 } else {
                   console.error("❌ SDK Cast non disponible.");
                 }
